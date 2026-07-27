@@ -1,0 +1,9 @@
+# Bootstrap / scratch artifacts (not part of the automation)
+freight_raw.json
+freight_supplement.json
+build-initial.mjs
+gen.js
+hdj-freight-alert.user.js
+Sales Team Install/
+*.zip
+node_modules/

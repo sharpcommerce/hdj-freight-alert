@@ -1,0 +1,48 @@
+name: Update Freight Alert
+
+# Rebuilds freight-alert.user.js from live Shopify data. When the freight
+# list changes, it commits a new version and Tampermonkey auto-updates every
+# installed copy within a day.
+
+on:
+  schedule:
+    - cron: "0 13 * * *"      # daily at 13:00 UTC (~6am PT). Adjust as you like.
+  workflow_dispatch: {}         # lets you run it on demand from the Actions tab.
+
+permissions:
+  contents: write               # needed to commit the regenerated file.
+
+concurrency:
+  group: freight-alert
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Regenerate freight list
+        env:
+          SHOPIFY_STORE: hollywood-djmi
+          SHOPIFY_ADMIN_TOKEN: ${{ secrets.SHOPIFY_ADMIN_TOKEN }}
+        run: node generate.mjs
+
+      - name: Commit if changed
+        run: |
+          if [[ -n "$(git status --porcelain freight-alert.user.js)" ]]; then
+            git config user.name  "freight-alert-bot"
+            git config user.email "actions@github.com"
+            git add freight-alert.user.js
+            git commit -m "Auto-update freight list ($(date -u +%Y-%m-%d))"
+            git push
+            echo "Pushed updated freight-alert.user.js"
+          else
+            echo "No change - nothing to commit."
+          fi
