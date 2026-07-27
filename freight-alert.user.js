@@ -913,29 +913,39 @@
   }
 
   function findFreight() {
-    const hits = new Map();
+    const hits = [];
+    const seenRows = new Set();
+    // Never scan our own banner (its labels contain SKUs and would re-match).
+    const banner = document.getElementById(BANNER_ID);
+    const inBanner = (el) => !!(banner && el && banner.contains(el));
+    // Add one hit per line-item row. A single line can match by BOTH its SKU and
+    // its product-ID link; deduping on the row keeps it counted once.
+    function add(row, sku, label) {
+      if (row && seenRows.has(row)) return;
+      if (row) seenRows.add(row);
+      hits.push({ sku, el: row, label });
+    }
+    // Strategy 1: match by SKU text shown on the line.
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
     let n;
     while ((n = walker.nextNode())) {
       const t = n.nodeValue;
       if (!t || t.indexOf('H-') === -1) continue;
+      if (inBanner(n.parentElement)) continue;
       const found = t.match(SKU_RE);
       if (!found) continue;
       for (const raw of found) {
         const sku = raw.toUpperCase();
-        if (FREIGHT_SKUS.has(sku) && !hits.has(sku)) {
-          hits.set(sku, { sku, el: rowFor(n.parentElement), label: labelFor(n.parentElement, sku) });
-        }
+        if (FREIGHT_SKUS.has(sku)) add(rowFor(n.parentElement), sku, labelFor(n.parentElement, sku));
       }
     }
+    // Strategy 2: match by product-ID link (catches lines not already flagged by SKU).
     document.querySelectorAll('a[href*="/products/"]').forEach((a) => {
+      if (inBanner(a)) return;
       const m = a.getAttribute('href').match(/\/products\/(\d+)/);
-      if (m && FREIGHT_IDS.has(m[1])) {
-        const key = 'PID:' + m[1];
-        if (!hits.has(key)) hits.set(key, { sku: null, el: rowFor(a), label: (a.textContent || '').trim() || ('product ' + m[1]) });
-      }
+      if (m && FREIGHT_IDS.has(m[1])) add(rowFor(a), null, (a.textContent || '').trim() || ('product ' + m[1]));
     });
-    return [...hits.values()];
+    return hits;
   }
 
   function rowFor(el) {
