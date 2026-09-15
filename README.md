@@ -99,3 +99,25 @@ SHOPIFY_ADMIN_TOKEN=shpat_xxx SHOPIFY_STORE=hollywood-djmi node generate.mjs
 ```
 
 Requires Node 18+.
+
+---
+
+## Draft Order Product Filter
+
+A second, separate script for the same sales team. `draft-product-filter.user.js`
+keeps packages, kits, and open-box / B-Stock / C-Stock listings out of the
+product search on draft orders, so reps can find the single item they need.
+Adding `pkg` to a search, or clicking "show everything" in the blue note the
+script adds, shows everything again. Nothing in Shopify changes.
+
+It works from rules (product types, title words, tags, SKU suffixes), so unlike
+the freight list it needs no Shopify token and no scheduled rebuild.
+
+Install link (with Tampermonkey installed, opening it shows the install page):
+
+```
+https://raw.githubusercontent.com/sharpcommerce/hdj-freight-alert/main/draft-product-filter.user.js
+```
+
+To ship a change: update the script, bump its `@version`, and push it here.
+Installed copies update within about a day.
