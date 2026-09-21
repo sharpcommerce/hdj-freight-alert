@@ -28,20 +28,23 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Check the Shopify token is configured
+      - name: Check the Shopify credentials are configured
         env:
-          SHOPIFY_ADMIN_TOKEN: ${{ secrets.SHOPIFY_ADMIN_TOKEN }}
+          SHOPIFY_CLIENT_SECRET: ${{ secrets.SHOPIFY_CLIENT_SECRET }}
         run: |
-          if [[ -z "$SHOPIFY_ADMIN_TOKEN" ]]; then
-            echo "::error title=Missing SHOPIFY_ADMIN_TOKEN::The repo secret SHOPIFY_ADMIN_TOKEN is not set, so the freight list cannot be refreshed and the sales team's alert is frozen at its last build. Add it under Settings > Secrets and variables > Actions."
+          if [[ -z "$SHOPIFY_CLIENT_SECRET" ]]; then
+            echo "::error title=Missing SHOPIFY_CLIENT_SECRET::The repo secret SHOPIFY_CLIENT_SECRET is not set, so the freight list cannot be refreshed and the sales team's alert is frozen at its last build. Copy it from Shopify Dev Dashboard > Freight Alert Sync > App settings > Credentials > Secret, and add it under Settings > Secrets and variables > Actions."
             exit 1
           fi
-          echo "Token present."
+          echo "Credentials present."
 
       - name: Regenerate freight list
         env:
           SHOPIFY_STORE: hollywood-djmi
-          SHOPIFY_ADMIN_TOKEN: ${{ secrets.SHOPIFY_ADMIN_TOKEN }}
+          # Client ID is not a secret - Shopify documents it as safe to expose.
+          # The Secret below is what protects it.
+          SHOPIFY_CLIENT_ID: cf066c5a37ca317b4f31abf6434b9777
+          SHOPIFY_CLIENT_SECRET: ${{ secrets.SHOPIFY_CLIENT_SECRET }}
         run: node generate.mjs
 
       - name: Commit if changed

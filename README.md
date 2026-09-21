@@ -29,23 +29,39 @@ Create a repo (e.g. `hdj-freight-alert`) and add these files.
 > freight SKU list and the script - **no passwords or tokens** (the Shopify
 > token lives in encrypted Actions secrets, never in the code).
 
-### 2. Create a Shopify token for the automation
+### 2. Create the Shopify app for the automation
 
-In Shopify admin:
+> **Not the old "Develop apps" flow.** Shopify retired admin-created custom
+> apps — you can no longer make one, and there is no **API credentials** tab
+> and no pasteable `shpat_…` token. Apps now live in the **Dev Dashboard** and
+> authenticate with the client credentials grant, exchanging a Client ID +
+> Secret for a 24-hour token on each run. `generate.mjs` does that exchange.
 
-1. **Settings → Apps and sales channels → Develop apps → Create an app**
-2. Name it `Freight Alert Sync`
-3. **Configure Admin API scopes** → check **`read_products`** → Save
-4. **Install app**, then **API credentials → reveal the Admin API access token**
-   (starts with `shpat_…`). Copy it.
+In the [Dev Dashboard](https://dev.shopify.com/dashboard):
 
-### 3. Store the token as a repo secret
+1. **Apps → Create app**, name it `Freight Alert Sync`
+2. On the app's **version**, select the **`read_products`** scope, then release it
+3. **Install app** onto the store — it must be in the **same Shopify org** as the
+   app, or the token exchange fails with `shop_not_permitted`
+4. **App settings → Credentials** → copy the **Client ID** and the **Secret**
+
+> Ignore the **App automation token** panel on that page. Despite saying "for
+> CI/CD workflows", it authenticates the *Shopify CLI*, not Admin API requests.
+> Using it (or the Secret directly) gives `Invalid API key or access token`.
+
+### 3. Store the secret in the repo
+
+The **Client ID is not a secret** (Shopify documents it as safe to expose) and
+is set directly in `.github/workflows/update-freight-alert.yml`. Only the Secret
+needs protecting.
 
 In the GitHub repo: **Settings → Secrets and variables → Actions → New
 repository secret**
 
-- Name: `SHOPIFY_ADMIN_TOKEN`
-- Value: the `shpat_…` token
+- Name: `SHOPIFY_CLIENT_SECRET`
+- Value: the **Secret** from App settings → Credentials
+
+If you ever rotate the Secret in the Dev Dashboard, update this secret to match.
 
 ### 4. Build it once
 
@@ -95,10 +111,14 @@ install link, that guide's Step 3 becomes "click this link" instead of copy/past
 ## Running the generator locally (optional)
 
 ```bash
-SHOPIFY_ADMIN_TOKEN=shpat_xxx SHOPIFY_STORE=hollywood-djmi node generate.mjs
+SHOPIFY_CLIENT_ID=xxx SHOPIFY_CLIENT_SECRET=yyy node generate.mjs
 ```
 
-Requires Node 18+.
+Requires Node 18+. `SHOPIFY_STORE` defaults to `hollywood-djmi`.
+
+Writes `last-checked.json` on every run (the heartbeat that proves the sync is
+alive) and rewrites `freight-alert.user.js` only when the freight list actually
+changed.
 
 ---
 

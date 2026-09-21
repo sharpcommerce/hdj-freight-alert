@@ -7,13 +7,25 @@
  * set actually changed) bumps the @version so Tampermonkey auto-updates
  * every installed copy.
  *
- * Env vars:
- *   SHOPIFY_STORE        myshopify subdomain      (default: hollywood-djmi)
- *   SHOPIFY_ADMIN_TOKEN  Admin API access token   (REQUIRED - read_products)
- *   GITHUB_REPOSITORY    owner/repo               (set automatically in Actions)
- *   GITHUB_REF_NAME      branch name              (set automatically in Actions)
+ * Auth: this is a Dev Dashboard app, so there is no pasteable shpat_ token to
+ * store. Dev Dashboard apps authenticate with the client credentials grant -
+ * we exchange the app's Client ID + Secret for a 24h access token at the start
+ * of each run. (Sending the client_id/client_secret straight to the GraphQL
+ * Admin API is what produces "Invalid API key or access token".)
  *
- * Run locally:  SHOPIFY_ADMIN_TOKEN=shpat_xxx node generate.mjs
+ * Env vars:
+ *   SHOPIFY_STORE          myshopify subdomain    (default: hollywood-djmi)
+ *   SHOPIFY_CLIENT_ID      app Client ID          (REQUIRED - not secret)
+ *   SHOPIFY_CLIENT_SECRET  app Secret             (REQUIRED - keep secret)
+ *   SHOPIFY_ADMIN_TOKEN    legacy shpat_ token    (optional; skips the exchange)
+ *   GITHUB_REPOSITORY      owner/repo             (set automatically in Actions)
+ *   GITHUB_REF_NAME        branch name            (set automatically in Actions)
+ *
+ * The app needs the read_products scope on its active version, and must be
+ * installed on a store in the SAME Shopify org (otherwise: shop_not_permitted).
+ *
+ * Run locally:
+ *   SHOPIFY_CLIENT_ID=... SHOPIFY_CLIENT_SECRET=... node generate.mjs
  */
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -21,7 +33,9 @@ import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
 const STORE = process.env.SHOPIFY_STORE || 'hollywood-djmi';
-const TOKEN = process.env.SHOPIFY_ADMIN_TOKEN;
+const CLIENT_ID = process.env.SHOPIFY_CLIENT_ID;
+const CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET;
+const LEGACY_TOKEN = process.env.SHOPIFY_ADMIN_TOKEN;
 const API_VERSION = '2026-07';
 const TAG_QUERY = 'tag:freight OR tag:freefreight OR tag:liftgate';
 const OUT_FILE = 'freight-alert.user.js';
@@ -33,6 +47,46 @@ const BRANCH = process.env.GITHUB_REF_NAME || 'main';
 const RAW_URL = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/${OUT_FILE}`;
 
 const ENDPOINT = `https://${STORE}.myshopify.com/admin/api/${API_VERSION}/graphql.json`;
+const TOKEN_ENDPOINT = `https://${STORE}.myshopify.com/admin/oauth/access_token`;
+
+// Access token for this run. Valid 24h, so one exchange covers the whole job.
+let cachedToken = LEGACY_TOKEN || null;
+
+async function getAccessToken() {
+  if (cachedToken) return cachedToken;
+
+  const res = await fetch(TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+    }),
+  });
+
+  const body = await res.text();
+  if (!res.ok) {
+    // shop_not_permitted means the app and store are in different Shopify orgs.
+    throw new Error(`Token exchange failed (HTTP ${res.status}): ${body}`);
+  }
+
+  const { access_token, scope, expires_in } = JSON.parse(body);
+  if (!access_token) throw new Error(`Token endpoint returned no access_token: ${body}`);
+
+  // scope is a readback of the active app version's scopes - catches the case
+  // where the app was installed before read_products was added.
+  if (scope && !scope.split(/[,\s]+/).includes('read_products')) {
+    throw new Error(
+      `App is missing the read_products scope (granted: "${scope}"). ` +
+        'Add it to the app version in the Dev Dashboard and approve it on the store.'
+    );
+  }
+
+  console.log(`Got access token (scope: ${scope || 'unknown'}, expires in ${expires_in || '?'}s).`);
+  cachedToken = access_token;
+  return cachedToken;
+}
 
 export function hashData({ ids, skus }) {
   return createHash('sha256')
@@ -44,7 +98,10 @@ export function hashData({ ids, skus }) {
 async function gql(query, variables) {
   const res = await fetch(ENDPOINT, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': TOKEN },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Shopify-Access-Token': await getAccessToken(),
+    },
     body: JSON.stringify({ query, variables }),
   });
   if (!res.ok) throw new Error(`Shopify HTTP ${res.status}: ${await res.text()}`);
@@ -268,8 +325,12 @@ ${idLines}
 
 // --- main --------------------------------------------------------------------
 async function main() {
-  if (!TOKEN) {
-    console.error('ERROR: SHOPIFY_ADMIN_TOKEN is not set.');
+  if (!LEGACY_TOKEN && !(CLIENT_ID && CLIENT_SECRET)) {
+    console.error(
+      'ERROR: no credentials. Set SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET ' +
+        '(Dev Dashboard > your app > App settings > Credentials), or ' +
+        'SHOPIFY_ADMIN_TOKEN for a legacy shpat_ token.'
+    );
     process.exit(1);
   }
   console.log(`Fetching freight products from ${STORE}.myshopify.com ...`);
