@@ -22,9 +22,10 @@ import { pathToFileURL } from 'node:url';
 
 const STORE = process.env.SHOPIFY_STORE || 'hollywood-djmi';
 const TOKEN = process.env.SHOPIFY_ADMIN_TOKEN;
-const API_VERSION = '2025-01';
+const API_VERSION = '2026-07';
 const TAG_QUERY = 'tag:freight OR tag:freefreight OR tag:liftgate';
 const OUT_FILE = 'freight-alert.user.js';
+const HEARTBEAT_FILE = 'last-checked.json';
 
 // Auto-update URLs (self-configuring from the repo it runs in).
 const REPO = process.env.GITHUB_REPOSITORY || 'YOUR_GITHUB_USER/hdj-freight-alert';
@@ -303,6 +304,29 @@ async function main() {
   } else {
     console.log('Output left unchanged.');
   }
+
+  // Heartbeat: proves the sync actually ran. Kept in a separate file on purpose -
+  // stamping a date into the userscript would change it every day, churning
+  // @version and pushing pointless Tampermonkey updates to the whole sales team.
+  writeFileSync(
+    HEARTBEAT_FILE,
+    JSON.stringify(
+      {
+        checkedAt: new Date().toISOString(),
+        products: data.ids.length,
+        skus: data.skus.length,
+        version,
+        dataHash,
+        listChanged: changed,
+      },
+      null,
+      2
+    ) + '\n',
+    'utf8'
+  );
+  console.log(
+    `Heartbeat: ${data.ids.length} products, ${data.skus.length} SKUs, list ${changed ? 'CHANGED' : 'unchanged'}.`
+  );
 }
 
 // Run only when executed directly (not when imported by the initial builder).

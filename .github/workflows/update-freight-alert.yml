@@ -21,12 +21,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
+
+      - name: Check the Shopify token is configured
+        env:
+          SHOPIFY_ADMIN_TOKEN: ${{ secrets.SHOPIFY_ADMIN_TOKEN }}
+        run: |
+          if [[ -z "$SHOPIFY_ADMIN_TOKEN" ]]; then
+            echo "::error title=Missing SHOPIFY_ADMIN_TOKEN::The repo secret SHOPIFY_ADMIN_TOKEN is not set, so the freight list cannot be refreshed and the sales team's alert is frozen at its last build. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "Token present."
 
       - name: Regenerate freight list
         env:
@@ -36,13 +46,20 @@ jobs:
 
       - name: Commit if changed
         run: |
-          if [[ -n "$(git status --porcelain freight-alert.user.js)" ]]; then
+          # last-checked.json changes every run; it is the heartbeat that proves
+          # this job is still alive. freight-alert.user.js only changes when the
+          # freight list itself changed.
+          if [[ -n "$(git status --porcelain freight-alert.user.js last-checked.json)" ]]; then
             git config user.name  "freight-alert-bot"
             git config user.email "actions@github.com"
-            git add freight-alert.user.js
-            git commit -m "Auto-update freight list ($(date -u +%Y-%m-%d))"
+            git add freight-alert.user.js last-checked.json
+            if [[ -n "$(git diff --cached --name-only -- freight-alert.user.js)" ]]; then
+              git commit -m "Auto-update freight list ($(date -u +%Y-%m-%d))"
+            else
+              git commit -m "Freight list checked, no change ($(date -u +%Y-%m-%d))"
+            fi
             git push
-            echo "Pushed updated freight-alert.user.js"
+            echo "Pushed."
           else
-            echo "No change - nothing to commit."
+            echo "Nothing to commit."
           fi
