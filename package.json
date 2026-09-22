@@ -1,0 +1,14 @@
+{
+  "name": "hdj-freight-alert",
+  "private": true,
+  "type": "module",
+  "description": "Draft-order shipping alert for the Hollywood DJ sales team",
+  "scripts": {
+    "build": "node generate.mjs",
+    "build:cache": "node generate.mjs --from-cache catalog-cache.json",
+    "test": "node test/shipping-alert.test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0"
+  }
+}

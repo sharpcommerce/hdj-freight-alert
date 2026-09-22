@@ -1,19 +1,61 @@
-# Hollywood DJ - Freight Alert (auto-updating)
+# Hollywood DJ - Shipping Alert (auto-updating)
 
 Warns the sales team, right inside the Shopify **draft-order editor**, when an
-order contains an item that ships by freight (LTL). A red banner appears at the
-top of the page and the freight line is outlined in red with a `FREIGHT / LTL`
-pill.
+order contains an item the website would **not** ship free. A banner appears at
+the top of the page, each offending line is outlined and pilled, and typing $0
+shipping on such an order is gated behind a confirm.
 
-The freight list is generated from **every product tagged `freight`,
-`freefreight`, or `liftgate`**. A scheduled GitHub Action rebuilds the script
-daily; when the list changes, Tampermonkey **auto-updates every installed copy**.
-Reps install once from a link and never touch it again.
+Draft orders bypass every website shipping rule, so the rep's typed rate is the
+only control. This puts the rule back in front of them at the moment it matters.
+
+### What it flags
+
+| Tag | Pill | What the website does |
+|---|---|---|
+| `freight` / `freefreight` / `liftgate` | `FREIGHT / LTL` | ships LTL, rep must quote freight |
+| `nofreeshipping` | `NO FREE SHIPPING` | charges the full shipping rate |
+| `condition-deal` | `DEAL - NO FREE SHIP` | B-Stock / C-Stock / Open Box, also excluded |
+| `shippingdiscount` | `50% SHIPPING` | charges half the rate |
+| `freeshipping` | `SHIPS FREE` | overrides every exclusion, whole cart ships free |
+| `nofreeshipping` + `shippingdiscount` | `50% SHIPPING (TAG CONFLICT)` | behaves as 50%; the tags should be cleaned up |
+
+**One excluded item removes free shipping from the whole cart**, so the banner
+warns at order level, not just on the line.
+
+Where a SellerCloud shipping estimate exists, the banner quotes it
+("est. $110.15 to ship"). A rep arguing with a customer about shipping needs a
+number, not a prohibition.
+
+### The $0 gate
+
+Clicking **Send invoice** / **Create order** / **Collect payment** while
+shipping reads $0 and the order holds an excluded item raises a confirm listing
+the items and the estimated cost. The rep can always continue - it exists so it
+cannot happen by reflex.
+
+It deliberately **fails open**: if the shipping amount cannot be read off the
+page, no gate fires. Shopify reshuffles this markup without notice, and a gate
+that failed closed would stop reps quoting.
 
 ```
-generate.mjs                         ← builds freight-alert.user.js from live Shopify data
+generate.mjs                                ← builds freight-alert.user.js from live Shopify data
+catalog-cache.json                          ← snapshot for credential-free rebuilds
+shipping-cost.json                          ← SKU -> SellerCloud shipping estimate
+test/shipping-alert.test.mjs                ← jsdom behaviour tests (npm test)
 .github/workflows/update-freight-alert.yml  ← runs generate.mjs daily, commits on change
-freight-alert.user.js                ← the hosted script (created by the first workflow run)
+freight-alert.user.js                       ← the hosted script the sales team installs
+```
+
+The filename and `@namespace` are unchanged from the freight-only version on
+purpose: every copy already installed auto-updates into this one, so nobody has
+to reinstall.
+
+### Rebuilding
+
+```bash
+npm test                                          # jsdom behaviour tests
+node generate.mjs                                 # live, needs Shopify credentials
+node generate.mjs --from-cache catalog-cache.json # offline, no credentials
 ```
 
 ---

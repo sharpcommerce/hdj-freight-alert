@@ -1,8 +1,17 @@
 {
-  "checkedAt": "2026-09-21T18:35:49.634Z",
-  "products": 392,
-  "skus": 461,
-  "version": "1.2.1",
-  "dataHash": "cb2e84edf651",
-  "listChanged": false
+  "checkedAt": "2026-09-22T13:15:24.785Z",
+  "products": 2121,
+  "skus": 2230,
+  "byFlag": {
+    "nf": 362,
+    "cd": 617,
+    "sd": 1118,
+    "fr": 225,
+    "fs": 29
+  },
+  "costs": 411,
+  "version": "1.2.3",
+  "dataHash": "c808ca9b7221",
+  "listChanged": true,
+  "source": "cache:catalog-cache.json"
 }
