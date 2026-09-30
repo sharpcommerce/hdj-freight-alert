@@ -1,17 +1,17 @@
 {
-  "checkedAt": "2026-09-29T18:33:46.524Z",
-  "products": 2094,
-  "skus": 2206,
+  "checkedAt": "2026-09-30T18:22:20.100Z",
+  "products": 2091,
+  "skus": 2203,
   "byFlag": {
     "nf": 346,
-    "cd": 597,
+    "cd": 594,
     "sd": 1125,
     "fr": 226,
     "fs": 29
   },
-  "costs": 422,
-  "version": "1.2.11",
-  "dataHash": "eacad1aa7eec",
+  "costs": 421,
+  "version": "1.2.12",
+  "dataHash": "64a05b93ec8a",
   "listChanged": true,
   "source": "shopify"
 }
