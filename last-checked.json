@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-10-25T17:01:04.919Z",
+  "checkedAt": "2026-10-26T19:08:50.206Z",
   "products": 2793,
   "skus": 2931,
   "byFlag": {
@@ -10,8 +10,8 @@
     "fs": 36
   },
   "costs": 637,
-  "version": "1.2.35",
-  "dataHash": "234fb9e0f04b",
+  "version": "1.2.36",
+  "dataHash": "af81bd0db430",
   "listChanged": true,
   "source": "shopify"
 }
